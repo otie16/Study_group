@@ -7,7 +7,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.forms import UserCreationForm
 from .models import Room, Topic, Message
-from .forms import RoomForm
+from .forms import RoomForm, UserForm
 # from django.http import HttpResponse
 
 # Create your views here.
@@ -114,16 +114,26 @@ def room(request, pk):
 @login_required(login_url='login') # Checks if a user is logged in if false redirect to login page
 def createRoom(request):
     form = RoomForm()
+    topics = Topic.objects.all()
     if request.method == 'POST':
-        form = RoomForm(request.POST)
-        if form.is_valid():
-           room = form.save(commit=False)
-        #    saving the user who creates a room as a host
-           room.host = request.user
-           room.save()
-           return redirect('home')
+        topic_name = request.POST.get('topic')
+        topic, created = Topic.objects.get_or_create(name=topic_name)
 
-    context = {'form': form}
+        Room.objects.create(
+            host=request.user,
+            topic=topic,
+            name=request.POST.get('name'),
+            description=request.POST.get('description')
+        )
+        # form = RoomForm(request.POST)
+        # if form.is_valid():
+        #    room = form.save(commit=False)
+        # #    saving the user who creates a room as a host
+        #    room.host = request.user
+        #    room.save()
+        return redirect('home')
+
+    context = {'form': form, 'topics': topics}
     return render(request, 'base/room_form.html', context)
 
 def userProfile(request, pk):
@@ -140,17 +150,25 @@ def userProfile(request, pk):
 def updateRoom(request, pk):
     room = Room.objects.get(id=pk)
     form = RoomForm(instance=room)
+    topics = Topic.objects.all()
 
     if request.user != room.host:
         return HttpResponse("You are not allowed here!!")
 
     if request.method == 'POST':
-        form = RoomForm(request.POST, instance=room)
-        if form.is_valid():
-            form.save()
-            return redirect('home')
+        topic_name = request.POST.get('topic')
+        topic, created = Topic.objects.get_or_create(name=topic_name)
+        # form = RoomForm(request.POST, instance=room)
+        room.name = request.POST.get('name')
+        room.topic = topic
+        room.description = request.POST.get('description')
+        room.save()
+        # if form.is_valid():
+        #     form.save()
 
-    context = {"form": form}
+        return redirect('home')
+
+    context = {'form': form, 'topics':topics, 'room': room}
     return render(request, 'base/room_form.html', context)
 
 # Deletes the room
@@ -182,21 +200,34 @@ def deleteMessage(request, pk):
 # @login_required(login_url='login')
 # def editMessage(request, pk):
 #     message = Message.objects.get(id=pk)
-#     form = MessageForm(instance=room)
 
 #     if request.user != message.user:
 #          return HttpResponse("You are not allowed to edit this message!")
 
 #     if request.method == "POST":
-#         form = MessageForm(request.POST, instance=message)
-#         if form.is_valid():
-#             form.save()
-#             return redirect('home')
+#         # message_body = request.POST.get('body')
+#         message.body = request.POST.get('body')
+#         message.save()
+#         # form = MessageForm(request.POST, instance=message)
+#         # if form.is_valid():
+#         #     form.save()
+#         return redirect('room')
     
-#     context = {"form": form}
-#     return render(request, 'base/home.html', context)
+#     context = {"message": message}
+#     return render(request, 'base/room.html', context)
 
-    
+@login_required(login_url='login')
+def updateUser(request):
+    user = request.user
+    form = UserForm(instance=user)
+    if request.method == 'POST':
+        form = UserForm(request.POST, instance=user)
+        if form.is_valid():
+            form.save()
+            return redirect('user-profile', pk=user.id)
+            
+    return render(request, 'base/update-user.html', {'form': form})
+
         
 
 
